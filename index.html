@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>أداة إضافة أعضاء تيليجرام</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; }
+        :root {
+            --primary: #0088cc; --primary-dark: #006ba3; --success: #28a745;
+            --danger: #dc3545; --warning: #ffc107; --info: #17a2b8;
+            --dark: #1a1a2e; --darker: #16213e; --card: #0f3460;
+            --text: #ffffff; --text-muted: #8899aa; --border: rgba(255,255,255,0.1);
+        }
+        body { background: linear-gradient(135deg, var(--dark) 0%, var(--darker) 100%); color: var(--text); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 16px; border: 1px solid var(--border); }
+        .header h1 { font-size: 28px; margin-bottom: 8px; background: linear-gradient(90deg, #0088cc, #00d4ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header p { color: var(--text-muted); font-size: 14px; }
+        .status-indicator { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+        .status-indicator.idle { background: rgba(255,255,255,0.1); color: var(--text-muted); }
+        .status-indicator.running { background: rgba(40,167,69,0.2); color: var(--success); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab-btn { flex: 1; min-width: 150px; padding: 14px 20px; border: none; border-radius: 12px; background: rgba(255,255,255,0.05); color: var(--text-muted); font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s; border: 1px solid var(--border); }
+        .tab-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+        .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .card { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 25px; margin-bottom: 20px; border: 1px solid var(--border); }
+        .card h2 { font-size: 18px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; color: var(--primary); }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: var(--text-muted); }
+        .form-control { width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text); font-size: 14px; transition: border-color 0.3s; }
+        .form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,136,204,0.15); }
+        textarea.form-control { min-height: 150px; resize: vertical; direction: ltr; text-align: left; font-family: monospace; font-size: 13px; line-height: 1.6; }
+        input[type="number"].form-control { direction: ltr; text-align: center; font-size: 16px; font-weight: bold; }
+        .row { display: flex; gap: 15px; flex-wrap: wrap; }
+        .col-3 { flex: 1; min-width: 220px; } .col-2 { flex: 1; min-width: 300px; }
+        .btn { padding: 12px 24px; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover:not(:disabled) { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover:not(:disabled) { background: #218838; transform: translateY(-2px); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover:not(:disabled) { background: #c82333; }
+        .btn-warning { background: var(--warning); color: var(--dark); }
+        .btn-block { width: 100%; justify-content: center; }
+        .accounts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
+        .account-card { background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; align-items: center; gap: 15px; transition: all 0.3s; }
+        .account-avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--info)); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; flex-shrink: 0; }
+        .account-info { flex: 1; min-width: 0; }
+        .account-info .name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .account-info .phone { font-size: 12px; color: var(--text-muted); direction: ltr; text-align: right; }
+        .account-status { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .account-status.active { background: var(--success); box-shadow: 0 0 8px var(--success); }
+        .account-status.inactive { background: var(--danger); }
+        .btn-delete { background: none; border: none; color: var(--danger); font-size: 18px; cursor: pointer; opacity: 0.7; }
+        .progress-container { margin-top: 15px; }
+        .progress-bar-wrapper { background: rgba(255,255,255,0.1); border-radius: 20px; height: 24px; overflow: hidden; margin-bottom: 15px; }
+        .progress-bar { height: 100%; background: linear-gradient(90deg, var(--primary), var(--info)); border-radius: 20px; transition: width 0.5s ease; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; min-width: 40px; }
+        .progress-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 15px; }
+        .stat-box { background: rgba(255,255,255,0.05); border-radius: 10px; padding: 12px; text-align: center; border: 1px solid var(--border); }
+        .stat-box .stat-value { font-size: 24px; font-weight: bold; margin-bottom: 4px; }
+        .stat-box .stat-label { font-size: 11px; color: var(--text-muted); }
+        .stat-box.success .stat-value { color: var(--success); }
+        .stat-box.failed .stat-value { color: var(--danger); }
+        .stat-box.skipped .stat-value { color: var(--warning); }
+        .stat-box.total .stat-value { color: var(--info); }
+        .console { background: #0d1117; border-radius: 12px; padding: 15px; height: 400px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.8; border: 1px solid var(--border); }
+        .log-line { padding: 3px 8px; border-radius: 4px; margin-bottom: 2px; word-wrap: break-word; }
+        .log-line.success { color: #7ee787; background: rgba(40,167,69,0.1); }
+        .log-line.error { color: #f85149; background: rgba(220,53,69,0.1); }
+        .log-line.warning { color: #d29922; background: rgba(255,193,7,0.1); }
+        .log-line.info { color: #58a6ff; background: rgba(0,136,204,0.1); }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: var(--darker); border-radius: 16px; padding: 30px; width: 90%; max-width: 400px; border: 1px solid var(--border); }
+        .modal h3 { margin-bottom: 20px; color: var(--primary); text-align: center; }
+        .file-upload-wrapper { border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s; }
+        .file-upload-wrapper:hover { border-color: var(--primary); background: rgba(0,136,204,0.05); }
+        .toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        .toast { padding: 12px 24px; border-radius: 10px; color: white; font-size: 14px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .toast.success { background: var(--success); } .toast.error { background: var(--danger); }
+        .toast.warning { background: var(--warning); color: var(--dark); } .toast.info { background: var(--info); }
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .badge-success { background: rgba(40,167,69,0.2); color: var(--success); }
+        .help-text { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+    </style>
+</head>
+<body>
+    <div class="toast-container" id="toastContainer"></div>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 أداة إضافة أعضاء تيليجرام</h1>
+            <p>نظام التناوب الذكي بين الحسابات المتعددة</p>
+            <div class="status-indicator idle" id="statusIndicator">
+                <span>⏸️</span> جاهز
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="accounts">📱 الحسابات</button>
+            <button class="tab-btn" data-tab="settings">⚙️ الإعدادات والإضافة</button>
+            <button class="tab-btn" data-tab="monitor">📊 المراقبة</button>
+        </div>
+
+        <!-- TAB 1: Accounts -->
+        <div class="tab-content active" id="tab-accounts">
+            <div class="card">
+                <h2>➕ تسجيل حساب جديد</h2>
+                <div class="row">
+                    <div class="col-3">
+                        <div class="form-group">
+                            <label>🔑 API ID</label>
+                            <input type="text" class="form-control" id="regApiId" placeholder="12345678" dir="ltr">
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="form-group">
+                            <label>🔑 API Hash</label>
+                            <input type="text" class="form-control" id="regApiHash" placeholder="abcdef1234567890abcdef" dir="ltr">
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="form-group">
+                            <label>📱 رقم الهاتف</label>
+                            <input type="text" class="form-control" id="regPhone" placeholder="+9665xxxxxxxx" dir="ltr">
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-block" onclick="sendCode()" id="btnSendCode">📨 إرسال رمز التحقق</button>
+            </div>
+
+            <div class="card">
+                <h2>📋 الحسابات المسجلة <span class="badge badge-success" id="accountsCount">0</span></h2>
+                <div class="accounts-grid" id="accountsGrid">
+                    <p style="color: var(--text-muted); grid-column: 1/-1; text-align: center; padding: 40px;">لا توجد حسابات مسجلة بعد</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: Settings -->
+        <div class="tab-content" id="tab-settings">
+            <div class="card">
+                <h2>🎯 إعدادات المجموعة المستهدفة</h2>
+                <div class="row">
+                    <div class="col-2">
+                        <div class="form-group">
+                            <label>👥 معرف المجموعة أو القناة *</label>
+                            <input type="text" class="form-control" id="targetGroup" placeholder="@group_username أو -1001234567890" dir="ltr">
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="form-group">
+                            <label>⏱️ زمن التأخير (ثانية) *</label>
+                            <input type="number" class="form-control" id="delayTime" value="10" min="1" max="3600" dir="ltr">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📝 قائمة الأعضاء</h2>
+                <div class="row">
+                    <div class="col-2">
+                        <div class="form-group">
+                            <label>أدخل أسماء المستخدمين (سطر لكل اسم)</label>
+                            <textarea class="form-control" id="membersText" placeholder="@user1&#10;@user2" dir="ltr"></textarea>
+                        </div>
+                    </div>
+                    <div class="col-3">
+                        <div class="form-group">
+                            <label>أو ارفع ملف نصي</label>
+                            <div class="file-upload-wrapper" id="fileUploadZone" onclick="document.getElementById('fileInput').click()">
+                                <div style="font-size: 32px;">📁</div>
+                                <div>اسحب الملف هنا أو انقر للاختيار</div>
+                            </div>
+                            <input type="file" id="fileInput" accept=".txt,.csv" style="display: none" onchange="handleFileSelect(event)">
+                        </div>
+                        <div class="form-group">
+                            <label>📊 الإحصائيات</label>
+                            <div style="display: flex; gap: 10px;">
+                                <div class="stat-box total" style="flex:1;">
+                                    <div class="stat-value" id="membersCount">0</div>
+                                    <div class="stat-label">عدد الأعضاء</div>
+                                </div>
+                                <div class="stat-box info" style="flex:1;">
+                                    <div class="stat-value" id="accountsCount2">0</div>
+                                    <div class="stat-label">عدد الحسابات</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="row" style="gap: 15px;">
+                    <div style="flex: 2;">
+                        <button class="btn btn-success btn-block" onclick="startAddition()" id="btnStart" style="padding: 16px;">🚀 بدء إضافة الأعضاء</button>
+                    </div>
+                    <div style="flex: 1;">
+                        <button class="btn btn-danger btn-block" onclick="stopAddition()" id="btnStop" style="padding: 16px;" disabled>⏹️ إيقاف</button>
+                    </div>
+                    <div style="flex: 1;">
+                        <button class="btn btn-warning btn-block" onclick="clearConsole()" style="padding: 16px;">🗑️ مسح السجل</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: Monitor -->
+        <div class="tab-content" id="tab-monitor">
+            <div class="card">
+                <h2>📈 التقدم</h2>
+                <div class="progress-container">
+                    <div class="progress-bar-wrapper">
+                        <div class="progress-bar" id="progressBar" style="width: 0%;">0%</div>
+                    </div>
+                    <div class="progress-info">
+                        <div class="stat-box total"><div class="stat-value" id="statTotal">0</div><div class="stat-label">الإجمالي</div></div>
+                        <div class="stat-box success"><div class="stat-value" id="statSuccess">0</div><div class="stat-label">نجح ✅</div></div>
+                        <div class="stat-box failed"><div class="stat-value" id="statFailed">0</div><div class="stat-label">فشل ❌</div></div>
+                        <div class="stat-box skipped"><div class="stat-value" id="statSkipped">0</div><div class="stat-label">تخطي ⚠️</div></div>
+                        <div class="stat-box"><div class="stat-value" id="statDisabled" style="color: var(--danger);">0</div><div class="stat-label">معطلة 🚫</div></div>
+                        <div class="stat-box info"><div class="stat-value" id="statCurrent">-</div><div class="stat-label">الحالي</div></div>
+                    </div>
+                    <div style="text-align: center; font-size: 13px; color: var(--text-muted);" id="currentOperation">جاهز للبدء...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🖥️ سجل العمليات</h2>
+                <div class="console" id="console">
+                    <div class="log-line info">[System] جاهز للعمل.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="codeModal">
+        <div class="modal">
+            <h3>🔐 رمز التحقق</h3>
+            <div class="form-group">
+                <label>أدخل الرمز المرسل لهاتفك</label>
+                <input type="text" class="form-control" id="verifyCode" placeholder="12345" dir="ltr" style="text-align: center; font-size: 24px; letter-spacing: 6px;">
+            </div>
+            <div class="form-group" id="passwordGroup" style="display: none;">
+                <label>🔒 كلمة مرور التحقق بخطوتين</label>
+                <input type="password" class="form-control" id="verifyPassword" placeholder="كلمة المرور" dir="ltr">
+            </div>
+            <div class="row" style="gap: 10px;">
+                <button class="btn btn-primary" style="flex: 1;" onclick="verifyCode()">تأكيد</button>
+                <button class="btn btn-danger" style="flex: 1;" onclick="closeModal()">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let isRunning = false;
+        let currentPhone = "";
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAccounts();
+            loadMembersText();
+
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    this.classList.add('active');
+                    document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+                });
+            });
+
+            document.getElementById('membersText').addEventListener('input', updateMembersCount);
+
+            socket.on('log', function(data) { addLog(data.type, data.message); });
+            socket.on('progress', function(data) { updateProgress(data); });
+            socket.on('addition_started', function(data) {
+                setRunningState(true);
+                document.getElementById('statTotal').textContent = data.total;
+            });
+            socket.on('addition_complete', function(data) {
+                setRunningState(false);
+                addLog('success', '✅ اكتملت العملية!');
+            });
+        });
+
+        async function sendCode() {
+            const apiId = document.getElementById('regApiId').value.trim();
+            const apiHash = document.getElementById('regApiHash').value.trim();
+            const phone = document.getElementById('regPhone').value.trim();
+
+            if (!apiId || !apiHash || !phone) return showToast('error', 'جميع الحقول مطلوبة!');
+
+            try {
+                const response = await fetch('/api/send_code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_id: apiId, api_hash: apiHash, phone: phone })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    currentPhone = phone;
+                    document.getElementById('codeModal').classList.add('show');
+                    showToast('success', 'تم إرسال رمز التحقق');
+                } else showToast('error', result.message);
+            } catch (e) { showToast('error', e.message); }
+        }
+
+        async function verifyCode() {
+            const code = document.getElementById('verifyCode').value.trim();
+            const password = document.getElementById('verifyPassword').value.trim();
+
+            try {
+                const response = await fetch('/api/verify_code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: currentPhone, code: code, password: password })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showToast('success', result.message);
+                    closeModal();
+                    loadAccounts();
+                } else if (result.needs_password) {
+                    document.getElementById('passwordGroup').style.display = 'block';
+                    showToast('warning', 'أدخل كلمة مرور التحقق بخطوتين');
+                } else showToast('error', result.message);
+            } catch (e) { showToast('error', e.message); }
+        }
+
+        function closeModal() { document.getElementById('codeModal').classList.remove('show'); }
+
+        async function loadAccounts() {
+            try {
+                const res = await fetch('/api/accounts');
+                const accounts = await res.json();
+                document.getElementById('accountsCount').textContent = accounts.length;
+                document.getElementById('accountsCount2').textContent = accounts.length;
+
+                const grid = document.getElementById('accountsGrid');
+                if (accounts.length === 0) {
+                    grid.innerHTML = '<p style="color: var(--text-muted); grid-column: 1/-1; text-align: center; padding: 40px;">لا توجد حسابات مسجلة بعد</p>';
+                    return;
+                }
+                grid.innerHTML = accounts.map(acc => `
+                    <div class="account-card">
+                        <div class="account-status ${acc.active ? 'active' : 'inactive'}"></div>
+                        <div class="account-avatar">${acc.name ? acc.name[0] : '👤'}</div>
+                        <div class="account-info">
+                            <div class="name">${acc.name || 'غير معروف'}</div>
+                            <div class="phone">${acc.phone}</div>
+                        </div>
+                        <button class="btn-delete" onclick="deleteAccount(${acc.id})">🗑️</button>
+                    </div>
+                `).join('');
+            } catch (e) {}
+        }
+
+        async function deleteAccount(id) {
+            if (!confirm('هل أنت متأكد من حذف الحساب؟')) return;
+            const res = await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
+            const result = await res.json();
+            if (result.success) loadAccounts();
+        }
+
+        function updateMembersCount() {
+            const text = document.getElementById('membersText').value;
+            const lines = text.split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
+            document.getElementById('membersCount').textContent = lines.length;
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    document.getElementById('membersText').value = e.target.result;
+                    updateMembersCount();
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        async function startAddition() {
+            const groupInput = document.getElementById('targetGroup').value.trim();
+            const delay = parseInt(document.getElementById('delayTime').value) || 10;
+            const members = document.getElementById('membersText').value.trim();
+
+            if (!groupInput || !members) return showToast('error', 'تأكد من إدخال كافة البيانات المطلوب إدخالها!');
+
+            const res = await fetch('/api/start_addition', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ group_id: groupInput, delay: delay, members: members })
+            });
+            const result = await res.json();
+            if (result.success) {
+                showToast('success', result.message);
+                setRunningState(true);
+                document.querySelector('[data-tab="monitor"]').click();
+            } else showToast('error', result.message);
+        }
+
+        async function stopAddition() {
+            await fetch('/api/stop_addition', { method: 'POST' });
+        }
+
+        function setRunningState(running) {
+            isRunning = running;
+            document.getElementById('btnStart').disabled = running;
+            document.getElementById('btnStop').disabled = !running;
+            document.getElementById('statusIndicator').className = running ? 'status-indicator running' : 'status-indicator idle';
+            document.getElementById('statusIndicator').innerHTML = running ? '<span>🔄</span> جاري العمل...' : '<span>⏸️</span> جاهز';
+        }
+
+        function updateProgress(data) {
+            const percent = data.total > 0 ? Math.round((data.current / data.total) * 100) : 0;
+            document.getElementById('progressBar').style.width = percent + '%';
+            document.getElementById('progressBar').textContent = percent + '%';
+
+            if (data.stats) {
+                document.getElementById('statSuccess').textContent = data.stats.success;
+                document.getElementById('statFailed').textContent = data.stats.failed;
+                document.getElementById('statSkipped').textContent = data.stats.skipped;
+                document.getElementById('statDisabled').textContent = data.stats.disabled_accounts;
+            }
+            if (data.member) {
+                document.getElementById('statCurrent').textContent = '@' + data.member.replace('@', '');
+            }
+        }
+
+        function addLog(type, message) {
+            const consoleBox = document.getElementById('console');
+            const line = document.createElement('div');
+            line.className = 'log-line ' + type;
+            line.textContent = `[${new Date().toLocaleTimeString('ar-SA')}] ${message}`;
+            consoleBox.appendChild(line);
+            consoleBox.scrollTop = consoleBox.scrollHeight;
+        }
+
+        function clearConsole() { document.getElementById('console').innerHTML = ''; }
+        async function loadMembersText() {
+            const res = await fetch('/api/load_members');
+            const data = await res.json();
+            if (data.members) {
+                document.getElementById('membersText').value = data.members;
+                updateMembersCount();
+            }
+        }
+        function showToast(type, message) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast ' + type;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+    </script>
+</body>
+</html>
