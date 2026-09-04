@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منصة تيليجرام المتكاملة | سحب وإضافة الأعضاء</title>
+    <!-- خط تجوال العصري و Socket.IO -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0b1120;
+            --bg-card: #151f32;
+            --bg-card-hover: #1c2a44;
+            --bg-glass: rgba(21, 31, 50, 0.85);
+            --primary: #0284c7;
+            --primary-glow: #38bdf8;
+            --primary-hover: #0369a1;
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.2);
+            --danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.2);
+            --warning: #f59e0b;
+            --warning-glow: rgba(245, 158, 11, 0.2);
+            --info: #06b6d4;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-glow: rgba(56, 189, 248, 0.3);
+            --radius: 14px;
+            --radius-sm: 8px;
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background: radial-gradient(circle at top right, #13223f 0%, var(--bg-dark) 60%);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 24px 16px;
+            line-height: 1.5;
+        }
+
+        .app-container {
+            max-width: 1240px;
+            margin: 0 auto;
+        }
+
+        /* رأس الصفحة */
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            background: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            padding: 20px 28px;
+            border-radius: var(--radius);
+            margin-bottom: 24px;
+            box-shadow: var(--shadow);
+        }
+
+        .brand-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .brand-logo {
+            width: 52px;
+            height: 52px;
+            background: linear-gradient(135deg, var(--primary), #00d2ff);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.35);
+        }
+
+        .brand-info h1 {
+            font-size: 22px;
+            font-weight: 800;
+            background: linear-gradient(90deg, #ffffff, #7dd3fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-info p {
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 18px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .status-pill.running .status-dot {
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 1.5s infinite;
+        }
+        .status-pill.paused .status-dot {
+            background: var(--warning);
+            box-shadow: 0 0 10px var(--warning);
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.6; }
+        }
+
+        /* شريط التبويبات */
+        .tabs-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 24px;
+            background: rgba(15, 23, 42, 0.6);
+            padding: 8px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            flex: 1;
+            min-width: 140px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 10px;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .tab-btn.active {
+            color: #ffffff;
+            background: var(--primary);
+            box-shadow: 0 4px 15px rgba(2, 132, 199, 0.35);
+        }
+
+        /* محتوى التبويب */
+        .tab-pane {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* البطاقات والحاويات */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 22px;
+            box-shadow: var(--shadow);
+            position: relative;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 17px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--primary-glow);
+        }
+
+        /* الشبكات والنماذج */
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 14px;
+            background: rgba(11, 17, 32, 0.7);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-main);
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-glow);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+        }
+
+        textarea.form-control {
+            min-height: 180px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            direction: ltr;
+            text-align: left;
+            resize: vertical;
+        }
+
+        /* الأزرار */
+        .btn {
+            padding: 11px 20px;
+            border-radius: var(--radius-sm);
+            border: none;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover:not(:disabled) { background: var(--primary-hover); box-shadow: 0 4px 15px rgba(2, 132, 199, 0.3); }
+
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover:not(:disabled) { background: #059669; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
+
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover:not(:disabled) { background: #dc2626; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3); }
+
+        .btn-warning { background: var(--warning); color: #000; }
+        .btn-warning:hover:not(:disabled) { background: #d97706; }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+        .btn-outline:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--text-muted);
+        }
+
+        .btn-block { width: 100%; }
+
+        /* قائمة الحسابات */
+        .accounts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+            gap: 16px;
+        }
+
+        .account-card {
+            background: rgba(11, 17, 32, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            transition: all 0.2s;
+        }
+
+        .account-card:hover {
+            border-color: var(--border-glow);
+            background: var(--bg-card-hover);
+        }
+
+        .acc-avatar {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), #8b5cf6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 700;
+            flex-shrink: 0;
+            color: white;
+        }
+
+        .acc-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .acc-name {
+            font-size: 14px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .acc-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            direction: ltr;
+            text-align: right;
+        }
+
+        .acc-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-weight: 600;
+            margin-top: 4px;
+            display: inline-block;
+        }
+
+        .badge-active { background: var(--success-glow); color: var(--success); }
+        .badge-error { background: var(--danger-glow); color: var(--danger); }
+
+        .acc-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .btn-icon {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-icon:hover {
+            color: var(--danger);
+            background: var(--danger-glow);
+            border-color: var(--danger);
+        }
+
+        /* مربعات الإحصائيات في المراقبة */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: rgba(11, 17, 32, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-val {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .stat-lbl {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .stat-success .stat-val { color: var(--success); }
+        .stat-danger .stat-val { color: var(--danger); }
+        .stat-warning .stat-val { color: var(--warning); }
+        .stat-info .stat-val { color: var(--info); }
+
+        /* شريط التقدم */
+        .progress-bar-container {
+            background: rgba(11, 17, 32, 0.8);
+            border-radius: 20px;
+            height: 22px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--primary), var(--info));
+            border-radius: 20px;
+            transition: width 0.4s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: white;
+            min-width: 40px;
+        }
+
+        /* شاشة السجلات (Console) */
+        .terminal-box {
+            background: #060911;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            height: 380px;
+            overflow-y: auto;
+            padding: 16px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .terminal-line {
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-bottom: 3px;
+            word-break: break-all;
+        }
+
+        .terminal-line.success { color: #34d399; }
+        .terminal-line.error { color: #f87171; }
+        .terminal-line.warning { color: #fbbf24; }
+        .terminal-line.info { color: #38bdf8; }
+
+        /* صندوق النافذة المنبثقة (Modal) */
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .modal-backdrop.show {
+            display: flex;
+        }
+
+        .modal-dialog {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 28px;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+            animation: modalPop 0.25s ease;
+        }
+
+        @keyframes modalPop {
+            from { transform: scale(0.92); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-dialog h3 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: var(--primary-glow);
+            text-align: center;
+        }
+
+        /* التنبيهات المنبثقة (Toasts) */
+        .toast-wrapper {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast-item {
+            padding: 12px 24px;
+            border-radius: 10px;
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            animation: toastSlide 0.3s ease;
+            pointer-events: auto;
+        }
+
+        @keyframes toastSlide {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .toast-success { background: #059669; }
+        .toast-error { background: #dc2626; }
+        .toast-warning { background: #d97706; }
+        .toast-info { background: #0284c7; }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13.5px;
+            color: var(--text-main);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .checkbox-label input {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .zone-upload {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: rgba(11, 17, 32, 0.4);
+        }
+
+        .zone-upload:hover {
+            border-color: var(--primary-glow);
+            background: rgba(56, 189, 248, 0.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="toast-wrapper" id="toastBox"></div>
+
+    <div class="app-container">
+        <!-- الرأس -->
+        <header class="app-header">
+            <div class="brand-section">
+                <div class="brand-logo">⚡</div>
+                <div class="brand-info">
+                    <h1>منصة تيليجرام المتكاملة (Pro Suite)</h1>
+                    <p>سحب وإضافة الأعضاء بالتناوب الذكي وحماية متطورة للحسابات</p>
+                </div>
+            </div>
+            <div class="status-pill" id="appStatusPill">
+                <div class="status-dot"></div>
+                <span id="appStatusText">النظام جاهز</span>
+            </div>
+        </header>
+
+        <!-- التبويبات -->
+        <nav class="tabs-nav">
+            <button class="tab-btn active" data-tab="accounts">📱 إدارة الحسابات</button>
+            <button class="tab-btn" data-tab="scraper">📥 سحب الأعضاء (Scraper)</button>
+            <button class="tab-btn" data-tab="adder">🚀 إضافة الأعضاء (Adder)</button>
+            <button class="tab-btn" data-tab="monitor">📊 المراقبة والتقارير</button>
+        </nav>
+
+        <!-- =================== التبويب 1: الحسابات =================== -->
+        <main class="tab-pane active" id="tab-accounts">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">➕ تسجيل وربط حساب تيليجرام جديد</div>
+                    <a href="https://my.telegram.org/apps" target="_blank" style="color: var(--primary-glow); font-size: 13px; text-decoration: none;">🔗 استخراج API ID & Hash</a>
+                </div>
+                <div class="grid-3">
+                    <div class="form-group">
+                        <label class="form-label">🔑 API ID</label>
+                        <input type="text" class="form-control" id="regApiId" placeholder="مثال: 12345678" dir="ltr">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">🔑 API Hash</label>
+                        <input type="text" class="form-control" id="regApiHash" placeholder="مثال: 39a4f..." dir="ltr">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">📱 رقم الهاتف (بالصيغة الدولية)</label>
+                        <input type="text" class="form-control" id="regPhone" placeholder="+9665xxxxxxxx" dir="ltr">
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-block" onclick="requestVerificationCode()" id="btnSendCode">
+                    📨 إرسال رمز التحقق
+                </button>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        📋 الحسابات المسجلة
+                        <span style="background: var(--primary); color: white; padding: 2px 10px; border-radius: 20px; font-size: 12px;" id="badgeAccountsCount">0</span>
+                    </div>
+                    <button class="btn btn-outline" onclick="checkAllAccounts()" id="btnCheckHealth">
+                        🔄 فحص صحة الحسابات
+                    </button>
+                </div>
+                <div class="accounts-grid" id="accountsGrid">
+                    <p style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 30px;">
+                        جاري تحميل الحسابات...
+                    </p>
+                </div>
+            </div>
+        </main>
+
+        <!-- =================== التبويب 2: سحب الأعضاء (Scraper) =================== -->
+        <main class="tab-pane" id="tab-scraper">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">📥 إعدادات سحب الأعضاء من المجموعات</div>
+                </div>
+                <div class="grid-2">
+                    <div>
+                        <div class="form-group">
+                            <label class="form-label">🎯 رابط أو معرف المجموعة المصدر *</label>
+                            <input type="text" class="form-control" id="scrapeSource" placeholder="@source_group أو https://t.me/..." dir="ltr">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">📱 اختيار الحساب المنفذ للسحب</label>
+                            <select class="form-control" id="scrapeAccountSelect">
+                                <option value="">الحساب الأول تلقائياً</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">🔢 الحد الأقصى للسحب (0 = سحب الكل)</label>
+                            <input type="number" class="form-control" id="scrapeLimit" value="0" min="0" dir="ltr">
+                        </div>
+                    </div>
+                    <div>
+                        <div class="form-group">
+                            <label class="form-label">⚡ الفلاتر الذكية للاستخراج</label>
+                            <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="scrapeFilterActive" checked>
+                                    <span>🟢 سحب المتفاعلين فقط (نشط مؤخراً / متصل الآن)</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="scrapeFilterBots" checked>
+                                    <span>🤖 استبعاد البوتات والحسابات الوهمية</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="scrapeFilterUsername">
+                                    <span>👤 أصحاب المعرفات فقط (يملكون @username)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div style="margin-top: 25px; display: flex; gap: 10px;">
+                            <button class="btn btn-primary" style="flex: 2;" onclick="startScraping()" id="btnStartScrape">
+                                🚀 بدء السحب
+                            </button>
+                            <button class="btn btn-danger" style="flex: 1;" onclick="stopScraping()" id="btnStopScrape" disabled>
+                                ⏹️ إيقاف
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        📊 نتائج السحب اللحظية
+                        <span style="background: var(--info); color: white; padding: 2px 10px; border-radius: 20px; font-size: 12px;" id="scrapeCountBadge">0</span>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-success" onclick="transferScrapedToAdder()" id="btnTransfer" disabled>
+                            📋 نقل لقائمة الإضافة
+                        </button>
+                        <button class="btn btn-outline" onclick="downloadScrapedFile()" id="btnDownloadScraped" disabled>
+                            💾 تنزيل ملف TXT
+                        </button>
+                    </div>
+                </div>
+                <div class="terminal-box" id="scrapeConsole" style="height: 240px;">
+                    <div class="terminal-line info">[Scraper] جاهز لبدء استخراج الأعضاء...</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- =================== التبويب 3: إضافة الأعضاء (Adder) =================== -->
+        <main class="tab-pane" id="tab-adder">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">🎯 إعدادات الإضافة والأمان المتقدمة</div>
+                </div>
+                <div class="grid-3">
+                    <div class="form-group">
+                        <label class="form-label">👥 معرف المجموعة الهدف *</label>
+                        <input type="text" class="form-control" id="targetGroup" placeholder="@target_group أو -1001234567890" dir="ltr">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">⏱️ مجال التأخير العشوائي (ثوانٍ)</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <input type="number" class="form-control" id="delayMin" value="15" min="5" placeholder="أقل" style="text-align: center;" dir="ltr">
+                            <span style="color: var(--text-muted);">-</span>
+                            <input type="number" class="form-control" id="delayMax" value="25" min="5" placeholder="أكثر" style="text-align: center;" dir="ltr">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">🛡️ الحد الأقصى للإضافة لكل حساب</label>
+                        <input type="number" class="form-control" id="maxPerAccount" value="20" min="1" max="50" style="text-align: center;" dir="ltr">
+                    </div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chkResume">
+                        <span>🔄 استئناف العملية من نقطة التوقف السابقة (تخطي من تمت إضافتهم)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        📝 قائمة الأعضاء المستهدفين
+                        <span style="background: var(--success); color: white; padding: 2px 10px; border-radius: 20px; font-size: 12px;" id="membersBadge">0 عضو</span>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-outline" onclick="saveMembersToServer()">💾 حفظ القائمة</button>
+                        <button class="btn btn-outline" onclick="clearMembersList()">🗑️ مسح</button>
+                        <a href="/api/members/export" class="btn btn-outline" style="text-decoration: none;">📥 تصدير</a>
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <textarea class="form-control" id="txtMembers" placeholder="@username1&#10;@username2&#10;123456789"></textarea>
+                    </div>
+                    <div>
+                        <div class="zone-upload" onclick="document.getElementById('fileUploadInput').click()">
+                            <div style="font-size: 40px; margin-bottom: 8px;">📂</div>
+                            <div style="font-weight: 700;">انقر لاختيار ملف أو اسحب الملف هنا</div>
+                            <div style="color: var(--text-muted); font-size: 12px; margin-top: 4px;">يدعم ملفات .txt و .csv</div>
+                        </div>
+                        <input type="file" id="fileUploadInput" accept=".txt,.csv" style="display: none" onchange="handleFileUpload(event)">
+
+                        <div style="margin-top: 25px; display: flex; flex-direction: column; gap: 10px;">
+                            <button class="btn btn-success" style="padding: 14px;" onclick="startAdditionProcess()" id="btnStartAdd">
+                                🚀 بدء عملية الإضافة
+                            </button>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn btn-warning" style="flex: 1;" onclick="pauseAdditionProcess()" id="btnPauseAdd" disabled>
+                                    ⏸️ إيقاف مؤقت
+                                </button>
+                                <button class="btn btn-primary" style="flex: 1;" onclick="resumeAdditionProcess()" id="btnResumeAdd" disabled>
+                                    ▶️ استئناف
+                                </button>
+                                <button class="btn btn-danger" style="flex: 1;" onclick="stopAdditionProcess()" id="btnStopAdd" disabled>
+                                    ⏹️ إنهاء
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- =================== التبويب 4: المراقبة والتقارير =================== -->
+        <main class="tab-pane" id="tab-monitor">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">📈 مؤشرات الأداء الحية</div>
+                    <div id="currentOperationText" style="color: var(--primary-glow); font-size: 13px; font-weight: 700;">جاهز للعمل...</div>
+                </div>
+
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progressBarFill">0%</div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-val" id="stTotal">0</div>
+                        <div class="stat-lbl">إجمالي الأعضاء</div>
+                    </div>
+                    <div class="stat-box stat-success">
+                        <div class="stat-val" id="stSuccess">0</div>
+                        <div class="stat-lbl">تمت الإضافة بنجاح ✅</div>
+                    </div>
+                    <div class="stat-box stat-warning">
+                        <div class="stat-val" id="stAlready">0</div>
+                        <div class="stat-lbl">أعضاء مسبقاً ℹ️</div>
+                    </div>
+                    <div class="stat-box stat-info">
+                        <div class="stat-val" id="stSkipped">0</div>
+                        <div class="stat-lbl">تم تخطيهم (خصوصية) ⚠️</div>
+                    </div>
+                    <div class="stat-box stat-danger">
+                        <div class="stat-val" id="stFailed">0</div>
+                        <div class="stat-lbl">فشل ❌</div>
+                    </div>
+                    <div class="stat-box stat-danger">
+                        <div class="stat-val" id="stDisabled">0</div>
+                        <div class="stat-lbl">حسابات مقيدة 🚫</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">🖥️ سجل العمليات المباشر (Live Terminal)</div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-outline" onclick="clearConsoleLog()">🗑️ مسح السجل</button>
+                        <button class="btn btn-outline" onclick="downloadConsoleLog()">💾 حفظ السجل</button>
+                    </div>
+                </div>
+                <div class="terminal-box" id="additionConsole">
+                    <div class="terminal-line info">[System] السيرفر متصل ويعمل بنجاح.</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- نافذة التحقق من الكود المنبثقة (Modal) -->
+    <div class="modal-backdrop" id="verifyModal">
+        <div class="modal-dialog">
+            <h3>🔐 تأكيد تسجيل الحساب</h3>
+            <p style="color: var(--text-muted); font-size: 13px; text-align: center; margin-bottom: 18px;" id="modalPhoneHint">
+                تم إرسال رمز التحقق إلى رقم هاتفك
+            </p>
+            <div class="form-group">
+                <label class="form-label">كود التحقق المرسل</label>
+                <input type="text" class="form-control" id="inputVerifyCode" placeholder="12345" dir="ltr" style="text-align: center; font-size: 22px; letter-spacing: 6px;">
+            </div>
+            <div class="form-group" id="group2FA" style="display: none;">
+                <label class="form-label">🔒 كلمة مرور التحقق بخطوتين (2FA)</label>
+                <input type="password" class="form-control" id="input2FAPassword" placeholder="أدخل كلمة المرور" dir="ltr">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-primary" style="flex: 1;" onclick="submitVerificationCode()">تأكيد وربط</button>
+                <button class="btn btn-outline" style="flex: 1;" onclick="closeModal()">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // تهيئة Socket.IO
+        const socket = io();
+        let currentAuthPhone = "";
+        let scrapedMembersCache = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initTabs();
+            loadAccountsList();
+            loadMembersFromServer();
+
+            // مستمع تغيير نص الأعضاء لتحديث العداد
+            document.getElementById('txtMembers').addEventListener('input', updateMembersBadge);
+
+            // استماع أحداث الـ WebSockets
+            socket.on('log', data => appendLog('additionConsole', data.type, data.message));
+            socket.on('progress', data => updateProgressUI(data));
+            socket.on('addition_started', data => {
+                setAppRunningState('running');
+                document.getElementById('stTotal').textContent = data.total;
+            });
+            socket.on('addition_complete', data => {
+                setAppRunningState('idle');
+                appendLog('additionConsole', 'success', '🎉 اكتملت العملية بالكامل!');
+                showToast('success', 'اكتملت عملية إضافة الأعضاء');
+            });
+
+            // أحداث السحب
+            socket.on('scraper_log', data => appendLog('scrapeConsole', data.type, data.message));
+            socket.on('scraper_progress', data => {
+                document.getElementById('scrapeCountBadge').textContent = data.count;
+            });
+            socket.on('scraper_complete', data => {
+                document.getElementById('btnStartScrape').disabled = false;
+                document.getElementById('btnStopScrape').disabled = true;
+                scrapedMembersCache = data.members || [];
+                document.getElementById('scrapeCountBadge').textContent = data.total;
+                document.getElementById('btnTransfer').disabled = scrapedMembersCache.length === 0;
+                document.getElementById('btnDownloadScraped').disabled = scrapedMembersCache.length === 0;
+                showToast('success', `تم استخراج ${data.total} عضو بنجاح!`);
+            });
+        });
+
+        // إدارة التبويبات
+        function initTabs() {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+                    this.classList.add('active');
+                    const targetPane = document.getElementById('tab-' + this.dataset.tab);
+                    if (targetPane) targetPane.classList.add('active');
+                });
+            });
+        }
+
+        // ================== إدارة الحسابات ==================
+        async function loadAccountsList() {
+            try {
+                const res = await fetch('/api/accounts');
+                const data = await res.json();
+                const accounts = data.accounts || [];
+
+                document.getElementById('badgeAccountsCount').textContent = accounts.length;
+                const grid = document.getElementById('accountsGrid');
+                const select = document.getElementById('scrapeAccountSelect');
+
+                select.innerHTML = '<option value="">الحساب الأول تلقائياً</option>';
+
+                if (accounts.length === 0) {
+                    grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 30px;">لا توجد حسابات مسجلة بعد. استخدم النموذج أعلاه لربط أول حساب.</p>';
+                    return;
+                }
+
+                grid.innerHTML = accounts.map(acc => `
+                    <div class="account-card">
+                        <div class="acc-avatar">${(acc.name && acc.name[0]) ? acc.name[0] : '📱'}</div>
+                        <div class="acc-details">
+                            <div class="acc-name">${acc.name}</div>
+                            <div class="acc-meta">${acc.phone}</div>
+                            <span class="acc-badge ${acc.active ? 'badge-active' : 'badge-error'}">
+                                ${acc.active ? '🟢 نشط وجاهز' : '🔴 بحاجة لإعادة ربط'}
+                            </span>
+                        </div>
+                        <div class="acc-actions">
+                            <button class="btn-icon" title="حذف الحساب" onclick="deleteAccount(${acc.id})">🗑️</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                accounts.forEach(acc => {
+                    const opt = document.createElement('option');
+                    opt.value = acc.id;
+                    opt.textContent = `${acc.name} (${acc.phone})`;
+                    select.appendChild(opt);
+                });
+
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function requestVerificationCode() {
+            const apiId = document.getElementById('regApiId').value.trim();
+            const apiHash = document.getElementById('regApiHash').value.trim();
+            const phone = document.getElementById('regPhone').value.trim();
+
+            if (!apiId || !apiHash || !phone) {
+                return showToast('error', 'يرجى ملء جميع الحقول المطلوبة!');
+            }
+
+            const btn = document.getElementById('btnSendCode');
+            btn.disabled = true;
+            btn.innerHTML = '⏳ جاري إرسال الكود...';
+
+            try {
+                const res = await fetch('/api/send_code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_id: apiId, api_hash: apiHash, phone: phone })
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    if (result.already_authorized) {
+                        showToast('success', result.message);
+                        loadAccountsList();
+                    } else {
+                        currentAuthPhone = phone;
+                        document.getElementById('modalPhoneHint').textContent = `تم إرسال الكود للرقم: ${phone}`;
+                        document.getElementById('verifyModal').classList.add('show');
+                        showToast('info', 'تم إرسال رمز التحقق');
+                    }
+                } else {
+                    showToast('error', result.message || 'فشل إرسال الكود');
+                }
+            } catch (e) {
+                showToast('error', 'خطأ في الاتصال بالسيرفر');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '📨 إرسال رمز التحقق';
+            }
+        }
+
+        async function submitVerificationCode() {
+            const code = document.getElementById('inputVerifyCode').value.trim();
+            const password = document.getElementById('input2FAPassword').value.trim();
+
+            if (!code) return showToast('error', 'يرجى إدخال الكود');
+
+            try {
+                const res = await fetch('/api/verify_code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: currentAuthPhone, code: code, password: password })
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    showToast('success', result.message);
+                    closeModal();
+                    loadAccountsList();
+                    // تفريغ الحقول
+                    document.getElementById('regPhone').value = '';
+                    document.getElementById('inputVerifyCode').value = '';
+                    document.getElementById('input2FAPassword').value = '';
+                    document.getElementById('group2FA').style.display = 'none';
+                } else if (result.needs_password) {
+                    document.getElementById('group2FA').style.display = 'block';
+                    showToast('warning', result.message);
+                } else {
+                    showToast('error', result.message);
+                }
+            } catch (e) {
+                showToast('error', 'خطأ في التحقق');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('verifyModal').classList.remove('show');
+        }
+
+        async function deleteAccount(id) {
+            if (!confirm('هل أنت متأكد من رغبتك في حذف هذا الحساب نهائياً؟')) return;
+            try {
+                const res = await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
+                const result = await res.json();
+                if (result.success) {
+                    showToast('success', 'تم حذف الحساب بنجاح');
+                    loadAccountsList();
+                } else {
+                    showToast('error', result.message);
+                }
+            } catch (e) {
+                showToast('error', 'فشل في حذف الحساب');
+            }
+        }
+
+        async function checkAllAccounts() {
+            const btn = document.getElementById('btnCheckHealth');
+            btn.disabled = true;
+            btn.innerHTML = '⏳ جاري الفحص...';
+            try {
+                const res = await fetch('/api/accounts/check', { method: 'POST' });
+                const result = await res.json();
+                if (result.success) {
+                    showToast('success', 'اكتمل فحص الحسابات بنجاح');
+                    loadAccountsList();
+                } else {
+                    showToast('error', result.message);
+                }
+            } catch (e) {
+                showToast('error', 'خطأ في فحص الحسابات');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🔄 فحص صحة الحسابات';
+            }
+        }
+
+        // ================== سحب الأعضاء (Scraper) ==================
+        async function startScraping() {
+            const source = document.getElementById('scrapeSource').value.trim();
+            const accountId = document.getElementById('scrapeAccountSelect').value;
+            const filterActive = document.getElementById('scrapeFilterActive').checked;
+            const filterBots = document.getElementById('scrapeFilterBots').checked;
+            const filterUsername = document.getElementById('scrapeFilterUsername').checked;
+            const limit = parseInt(document.getElementById('scrapeLimit').value) || 0;
+
+            if (!source) return showToast('error', 'يرجى إدخال معرف المجموعة المصدر!');
+
+            document.getElementById('btnStartScrape').disabled = true;
+            document.getElementById('btnStopScrape').disabled = false;
+            document.getElementById('scrapeConsole').innerHTML = '';
+            appendLog('scrapeConsole', 'info', `🚀 بدء سحب الأعضاء من: ${source}`);
+
+            try {
+                const res = await fetch('/api/scraper/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        source_group: source,
+                        account_id: accountId || null,
+                        filter_active: filterActive,
+                        filter_bots: filterBots,
+                        filter_has_username: filterUsername,
+                        limit: limit
+                    })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    showToast('success', result.message);
+                } else {
+                    showToast('error', result.message);
+                    document.getElementById('btnStartScrape').disabled = false;
+                    document.getElementById('btnStopScrape').disabled = true;
+                }
+            } catch (e) {
+                showToast('error', 'خطأ في بدء السحب');
+                document.getElementById('btnStartScrape').disabled = false;
+                document.getElementById('btnStopScrape').disabled = true;
+            }
+        }
+
+        async function stopScraping() {
+            await fetch('/api/scraper/stop', { method: 'POST' });
+            document.getElementById('btnStartScrape').disabled = false;
+            document.getElementById('btnStopScrape').disabled = true;
+        }
+
+        function transferScrapedToAdder() {
+            if (!scrapedMembersCache || scrapedMembersCache.length === 0) return;
+            const txt = document.getElementById('txtMembers');
+            const current = txt.value.trim();
+            const newContent = current ? current + '\n' + scrapedMembersCache.join('\n') : scrapedMembersCache.join('\n');
+            txt.value = newContent;
+            updateMembersBadge();
+            saveMembersToServer();
+            showToast('success', `تم نقل ${scrapedMembersCache.length} عضو إلى قائمة الإضافة`);
+            document.querySelector('[data-tab="adder"]').click();
+        }
+
+        function downloadScrapedFile() {
+            if (!scrapedMembersCache || scrapedMembersCache.length === 0) return;
+            const blob = new Blob([scrapedMembersCache.join('\n')], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `scraped_members_${Date.now()}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ================== إدارة قائمة الأعضاء ==================
+        async function loadMembersFromServer() {
+            try {
+                const res = await fetch('/api/members');
+                const data = await res.json();
+                if (data.members_text) {
+                    document.getElementById('txtMembers').value = data.members_text;
+                    updateMembersBadge();
+                }
+            } catch (e) {}
+        }
+
+        async function saveMembersToServer() {
+            const text = document.getElementById('txtMembers').value;
+            try {
+                const res = await fetch('/api/members', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ members: text })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    showToast('success', 'تم حفظ القائمة بنجاح');
+                }
+            } catch (e) {
+                showToast('error', 'فشل في حفظ القائمة');
+            }
+        }
+
+        function clearMembersList() {
+            if (!confirm('هل تريد مسح قائمة الأعضاء؟')) return;
+            document.getElementById('txtMembers').value = '';
+            updateMembersBadge();
+            saveMembersToServer();
+        }
+
+        function updateMembersBadge() {
+            const text = document.getElementById('txtMembers').value;
+            const count = text.split('\n').filter(l => l.trim() && !l.trim().startsWith('#')).length;
+            document.getElementById('membersBadge').textContent = `${count} عضو`;
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                document.getElementById('txtMembers').value = e.target.result;
+                updateMembersBadge();
+                saveMembersToServer();
+                showToast('success', `تم تحميل الملف: ${file.name}`);
+            };
+            reader.readAsText(file);
+        }
+
+        // ================== إضافة الأعضاء (Adder) ==================
+        async function startAdditionProcess() {
+            const targetGroup = document.getElementById('targetGroup').value.trim();
+            const delayMin = parseInt(document.getElementById('delayMin').value) || 15;
+            const delayMax = parseInt(document.getElementById('delayMax').value) || 25;
+            const maxPerAccount = parseInt(document.getElementById('maxPerAccount').value) || 20;
+            const resume = document.getElementById('chkResume').checked;
+            const members = document.getElementById('txtMembers').value.trim();
+
+            if (!targetGroup) return showToast('error', 'يرجى إدخال معرف المجموعة الهدف!');
+            if (!members) return showToast('error', 'قائمة الأعضاء فارغة!');
+
+            try {
+                const res = await fetch('/api/adder/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        group_id: targetGroup,
+                        delay_min: delayMin,
+                        delay_max: delayMax,
+                        max_per_account: maxPerAccount,
+                        resume: resume,
+                        members: members
+                    })
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    showToast('success', result.message);
+                    setAppRunningState('running');
+                    document.querySelector('[data-tab="monitor"]').click();
+                } else {
+                    showToast('error', result.message);
+                }
+            } catch (e) {
+                showToast('error', 'خطأ في بدء العملية');
+            }
+        }
+
+        async function pauseAdditionProcess() {
+            const res = await fetch('/api/adder/pause', { method: 'POST' });
+            const result = await res.json();
+            if (result.success) {
+                setAppRunningState('paused');
+                showToast('warning', 'تم إيقاف العملية مؤقتاً');
+            }
+        }
+
+        async function resumeAdditionProcess() {
+            const res = await fetch('/api/adder/resume', { method: 'POST' });
+            const result = await res.json();
+            if (result.success) {
+                setAppRunningState('running');
+                showToast('info', 'تم استئناف العملية');
+            }
+        }
+
+        async function stopAdditionProcess() {
+            if (!confirm('هل تريد إنهاء العملية الحالية؟')) return;
+            const res = await fetch('/api/adder/stop', { method: 'POST' });
+            const result = await res.json();
+            if (result.success) {
+                setAppRunningState('idle');
+                showToast('info', 'تم إنهاء العملية');
+            }
+        }
+
+        // ================== تحديث واجهة المراقبة والحالة ==================
+        function setAppRunningState(state) {
+            const pill = document.getElementById('appStatusPill');
+            const txt = document.getElementById('appStatusText');
+            const btnStart = document.getElementById('btnStartAdd');
+            const btnPause = document.getElementById('btnPauseAdd');
+            const btnResume = document.getElementById('btnResumeAdd');
+            const btnStop = document.getElementById('btnStopAdd');
+
+            pill.className = 'status-pill ' + state;
+
+            if (state === 'running') {
+                txt.textContent = 'جاري العمل بنشاط...';
+                btnStart.disabled = true;
+                btnPause.disabled = false;
+                btnResume.disabled = true;
+                btnStop.disabled = false;
+            } else if (state === 'paused') {
+                txt.textContent = 'متوقف مؤقتاً';
+                btnStart.disabled = true;
+                btnPause.disabled = true;
+                btnResume.disabled = false;
+                btnStop.disabled = false;
+            } else {
+                txt.textContent = 'النظام جاهز';
+                btnStart.disabled = false;
+                btnPause.disabled = true;
+                btnResume.disabled = true;
+                btnStop.disabled = true;
+            }
+        }
+
+        function updateProgressUI(data) {
+            const current = data.current || 0;
+            const total = data.total || 1;
+            const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+
+            const bar = document.getElementById('progressBarFill');
+            bar.style.width = percent + '%';
+            bar.textContent = percent + '%';
+
+            if (data.stats) {
+                document.getElementById('stSuccess').textContent = data.stats.success || 0;
+                document.getElementById('stAlready').textContent = data.stats.already_member || 0;
+                document.getElementById('stSkipped').textContent = data.stats.skipped || 0;
+                document.getElementById('stFailed').textContent = data.stats.failed || 0;
+                document.getElementById('stDisabled').textContent = data.stats.disabled_accounts || 0;
+            }
+
+            if (data.waiting) {
+                document.getElementById('currentOperationText').textContent = `⏳ انتظار ${data.delay || ''} ثانية بين العمليات...`;
+            } else if (data.member) {
+                document.getElementById('currentOperationText').textContent = `👤 معالجة: @${data.member.replace('@', '')} عبر الحساب: ${data.account || ''}`;
+            }
+        }
+
+        function appendLog(elementId, type, message) {
+            const box = document.getElementById(elementId);
+            if (!box) return;
+            const line = document.createElement('div');
+            line.className = 'terminal-line ' + type;
+            const timeStr = new Date().toLocaleTimeString('ar-SA');
+            line.textContent = `[${timeStr}] ${message}`;
+            box.appendChild(line);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function clearConsoleLog() {
+            document.getElementById('additionConsole').innerHTML = '';
+        }
+
+        function downloadConsoleLog() {
+            const text = document.getElementById('additionConsole').innerText;
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `addition_log_${Date.now()}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function showToast(type, message) {
+            const container = document.getElementById('toastBox');
+            const toast = document.createElement('div');
+            toast.className = `toast-item toast-${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3500);
+        }
+    </script>
+</body>
+</html>
